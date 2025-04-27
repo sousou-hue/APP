@@ -7,7 +7,7 @@ pipeline {
     stages {
         stage('Checkout Code') {
             steps {
-                git 'https://github.com/TON_COMPTE/TON_REPO.git'
+                git 'https://github.com/sousou-hue/APP'
             }
         }
         stage('Build APK') {
