@@ -1,19 +1,16 @@
 pipeline {
-    agent {
-        docker {
-            image 'openjdk:17'
-        }
-    }
+    agent any
+
     stages {
         stage('Checkout Code') {
             steps {
-                git 'https://github.com/sousou-hue/APP'
+                git 'https://github.com/sousou-hue/APP.git'
             }
         }
         stage('Build APK') {
             steps {
-                sh 'chmod +x gradlew'       // Autoriser gradlew à s'exécuter
-                sh './gradlew assembleDebug' // Construire l'APK
+                sh 'chmod +x gradlew'
+                sh './gradlew assembleDebug'
             }
         }
         stage('Archive APK') {
