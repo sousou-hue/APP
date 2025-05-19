@@ -1,9 +1,9 @@
 pipeline {
-  agent none
+  agent none                          // plus d’agent par défaut
 
   stages {
     stage('Prepare local.properties') {
-      agent { label 'android-build' }
+      agent { label 'android-build' } // sur votre nœud Android
       steps {
         sh '''
           cat > local.properties <<EOF
@@ -41,12 +41,12 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           sh '''
-            # Prépare la clé SSH
+            # Prépare la clé pour SSH
             mkdir -p /root/.ssh
             cp ${ANSIBLE_KEY} /root/.ssh/id_rsa
             chmod 600 /root/.ssh/id_rsa
 
-            # Exécute le playbook pour copier l’APK et déployer sur Kubernetes
+            # Lance le playbook
             cd /workspace
             ansible-playbook \
               -i inventory/k8s_hosts.ini \
