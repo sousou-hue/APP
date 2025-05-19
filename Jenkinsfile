@@ -11,20 +11,17 @@ EOF
         '''
       }
     }
-
     stage('Build APK') {
       steps {
         sh 'chmod +x gradlew'
         sh './gradlew assembleDebug'
       }
     }
-
     stage('Archive APK') {
       steps {
         archiveArtifacts artifacts: '**/app-debug.apk', fingerprint: true
       }
     }
-
     stage('Deploy with Ansible') {
       steps {
         withCredentials([sshUserPrivateKey(
@@ -32,17 +29,13 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
-            // 1) Repérer le chemin de l'APK généré
-            def apkPath = findFiles(glob: '**/app-debug.apk')[0].path
+            // Remplace findFiles() par le chemin connu :
+            def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            // 2) Lancer l'image Docker Ansible, en montant :
-            //    - le workspace (code, inventory, playbooks)
-            //    - la clé privée Jenkins
             docker.image('soumiael774/my-ansible-agent:latest').inside(
               "-v \$WORKSPACE:/workspace " +
               "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
             ) {
-              // 3) Exécuter le playbook avec la variable apk_src
               sh """
                 cd /workspace
                 ansible-playbook \\
