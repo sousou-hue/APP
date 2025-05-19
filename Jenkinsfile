@@ -1,8 +1,9 @@
 pipeline {
-  agent { label 'android-build' }
+  agent none                // plus d’agent par défaut
 
   stages {
     stage('Prepare local.properties') {
+      agent { label 'android-build' }
       steps {
         sh '''
           cat > local.properties <<EOF
@@ -13,6 +14,7 @@ EOF
     }
 
     stage('Build APK') {
+      agent { label 'android-build' }
       steps {
         sh 'chmod +x gradlew'
         sh './gradlew assembleDebug'
@@ -20,13 +22,13 @@ EOF
     }
 
     stage('Archive APK') {
+      agent { label 'android-build' }
       steps {
         archiveArtifacts artifacts: '**/app/build/outputs/apk/debug/*.apk', fingerprint: true
       }
     }
 
     stage('Deploy with Ansible') {
-      // Ce stage tourne dans un conteneur Docker Ansible, pas besoin de Docker sur android-build
       agent {
         docker {
           image 'soumiael774/my-ansible-agent:latest'
@@ -39,12 +41,10 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           sh '''
-            # Préparer la clé SSH pour Ansible
             mkdir -p /root/.ssh
             cp ${ANSIBLE_KEY} /root/.ssh/id_rsa
             chmod 600 /root/.ssh/id_rsa
 
-            # Exécuter le playbook
             cd /workspace
             ansible-playbook \
               -i inventory/k8s_hosts.ini \
