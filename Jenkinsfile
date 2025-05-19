@@ -38,7 +38,7 @@ EOF
             // 2) Lancer l'image Docker Ansible, en montant :
             //    - le workspace (code, inventory, playbooks)
             //    - la clé privée Jenkins
-            docker.image('votre-user/ansible-k8s:latest').inside(
+            docker.image('soumiael774/my-ansible-agent:latest').inside(
               "-v \$WORKSPACE:/workspace " +
               "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
             ) {
