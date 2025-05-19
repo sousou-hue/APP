@@ -1,5 +1,5 @@
 pipeline {
-  agent none                // plus d’agent par défaut
+  agent none
 
   stages {
     stage('Prepare local.properties') {
@@ -41,10 +41,12 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           sh '''
+            # Prépare la clé SSH
             mkdir -p /root/.ssh
             cp ${ANSIBLE_KEY} /root/.ssh/id_rsa
             chmod 600 /root/.ssh/id_rsa
 
+            # Exécute le playbook pour copier l’APK et déployer sur Kubernetes
             cd /workspace
             ansible-playbook \
               -i inventory/k8s_hosts.ini \
