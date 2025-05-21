@@ -3,6 +3,7 @@ pipeline {
 
   environment {
     APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
+    WORKSPACE_CONTAINER = "/workspace"
   }
 
   stages {
@@ -29,20 +30,31 @@ EOF
       }
     }
 
+    stage('Test Docker Mount') {
+      steps {
+        sh """
+          docker run --rm \
+            -v ${env.WORKSPACE}:${env.WORKSPACE_CONTAINER}:ro \
+            alpine \
+            /bin/sh -c "ls -al ${env.WORKSPACE_CONTAINER}/playbooks && cat ${env.WORKSPACE_CONTAINER}/playbooks/deploy_apk.yml"
+        """
+      }
+    }
+
     stage('Deploy with Ansible') {
       steps {
         withCredentials([file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')]) {
           script {
             sh """
               docker run --rm --network jenkins-net \
-                -v ${env.WORKSPACE}:${env.WORKSPACE}:ro \
+                -v ${env.WORKSPACE}:${env.WORKSPACE_CONTAINER}:ro \
                 -v \$KEY_FILE:/tmp/id_rsa:ro \
                 -e ANSIBLE_HOST_KEY_CHECKING=False \
                 soumiael774/my-ansible:latest \
-                  -i ${env.WORKSPACE}/inventory/k8s_hosts.ini \
-                  ${env.WORKSPACE}/playbooks/deploy_apk.yml \
+                  -i ${env.WORKSPACE_CONTAINER}/inventory/k8s_hosts.ini \
+                  ${env.WORKSPACE_CONTAINER}/playbooks/deploy_apk.yml \
                   --private-key /tmp/id_rsa \
-                  --extra-vars "apk_src=${env.WORKSPACE}/${env.APK_PATH}"
+                  --extra-vars "apk_src=${env.WORKSPACE_CONTAINER}/${env.APK_PATH}"
             """
           }
         }
