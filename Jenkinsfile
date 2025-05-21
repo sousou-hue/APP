@@ -18,8 +18,9 @@ pipeline {
     stage('Install Ansible') {
       steps {
         sh '''
-          # Installation rapide d’Ansible (si pas déjà présent)
-          which ansible || (sudo apt-get update && sudo apt-get install -y python3-pip sshpass && pip3 install ansible)
+          apt-get update
+          apt-get install -y python3-pip sshpass
+          pip3 install ansible
         '''
       }
     }
