@@ -27,38 +27,29 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
-        withCredentials([sshUserPrivateKey(
-          credentialsId: 'ansible-ssh-key',
-          keyFileVariable: 'ANSIBLE_KEY'
-        )]) {
+        // 1) On démarre un agent SSH dans Jenkins (avec votre credential SSH)
+        sshagent(['ansible-ssh-key']) {
           script {
-            // Chemin absolu de l'APK généré
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            // Debug: afficher le chemin exact de la clé injectée
-            echo "ANSIBLE_KEY file is at: ${ANSIBLE_KEY}"
-
+            // 2) On forwarde le socket SSH dans le conteneur
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +           // ignore l’ENTRYPOINT de l’image
-              "-u root " +                   // exécute en root pour avoir accès à /tmp
-              "-v ${ANSIBLE_KEY}:/tmp/id_rsa:ro" // monte UNIQUEMENT le fichier de clé
+              "--entrypoint '' " +
+              "-u root " +
+              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent " +
+              "-e SSH_AUTH_SOCK=/ssh-agent"
             ) {
+              // 3) On redirige les tmp d'Ansible vers /tmp
               withEnv(["HOME=/tmp"]) {
                 sh """
                   cd "${env.WORKSPACE}"
+                  # On désactive la vérification stricte de la clé hôte
+                  export ANSIBLE_HOST_KEY_CHECKING=False
 
-                  # Vérifier que /tmp/id_rsa est bien un fichier
-                  ls -l /tmp/id_rsa
-                  file /tmp/id_rsa
-
-                  # Sécuriser la clé, au cas où
-                  chmod 600 /tmp/id_rsa
-
-                  # Exécuter le playbook avec la clé privée
+                  # On lance le playbook : Ansible utilisera le SSH agent
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
-                    --private-key=/tmp/id_rsa \\
                     --extra-vars "apk_src=${apkPath}"
                 """
               }
