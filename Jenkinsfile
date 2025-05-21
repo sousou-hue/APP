@@ -27,26 +27,27 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
-        // 1) On démarre un agent SSH dans Jenkins (avec votre credential SSH)
         sshagent(['ansible-ssh-key']) {
           script {
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
+            // 1) On récupère la valeur exacte de SSH_AUTH_SOCK
+            echo "SSH_AUTH_SOCK is at: ${env.SSH_AUTH_SOCK}"
 
-            // 2) On forwarde le socket SSH dans le conteneur
+            // 2) On monte **le dossier contenant** le socket, 
+            //    et non juste le fichier, au même endroit.
+            def sockDir = env.SSH_AUTH_SOCK.substring(0, env.SSH_AUTH_SOCK.lastIndexOf('/'))
+
             docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +
               "-u root " +
-              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent " +
-              "-e SSH_AUTH_SOCK=/ssh-agent"
+              // Montre le répertoire entier
+              "-v ${sockDir}:${sockDir} " +
+              // On n'a pas besoin de -e, l'agent SSH injecte déjà SSH_AUTH_SOCK
+              ""
             ) {
-              // 3) On redirige les tmp d'Ansible vers /tmp
-              withEnv(["HOME=/tmp"]) {
+              withEnv(["HOME=/tmp", "ANSIBLE_HOST_KEY_CHECKING=False"]) {
                 sh """
                   cd "${env.WORKSPACE}"
-                  # On désactive la vérification stricte de la clé hôte
-                  export ANSIBLE_HOST_KEY_CHECKING=False
-
-                  # On lance le playbook : Ansible utilisera le SSH agent
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
