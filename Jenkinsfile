@@ -32,25 +32,29 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
-            // chemin absolu de l'APK
+            // Chemin absolu de l'APK généré
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
+            // Debug: afficher le chemin exact de la clé injectée
+            echo "ANSIBLE_KEY file is at: ${ANSIBLE_KEY}"
+
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +          // ignore l’ENTRYPOINT de l’image
-              "-u root " +                  // exécute en root pour accéder à /tmp
-              "-v ${ANSIBLE_KEY}:/tmp/id_rsa" // monte la clé dans /tmp/id_rsa
+              "--entrypoint '' " +           // ignore l’ENTRYPOINT de l’image
+              "-u root " +                   // exécute en root pour avoir accès à /tmp
+              "-v ${ANSIBLE_KEY}:/tmp/id_rsa:ro" // monte UNIQUEMENT le fichier de clé
             ) {
               withEnv(["HOME=/tmp"]) {
                 sh """
                   cd "${env.WORKSPACE}"
 
-                  # sécurise la clé pour SSH
+                  # Vérifier que /tmp/id_rsa est bien un fichier
+                  ls -l /tmp/id_rsa
+                  file /tmp/id_rsa
+
+                  # Sécuriser la clé, au cas où
                   chmod 600 /tmp/id_rsa
 
-                  # debug : vérifie la présence et les droits
-                  ls -l /tmp/id_rsa
-
-                  # lance le playbook en utilisant la clé et la variable apk_src
+                  # Exécuter le playbook avec la clé privée
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
