@@ -27,7 +27,7 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
-        sshagent (credentials: ['ansible-ssh-nopass']) {
+        sshagent (credentials: ['ansible-ssh-key']) {
           script {
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
