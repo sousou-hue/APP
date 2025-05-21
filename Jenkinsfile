@@ -41,16 +41,20 @@ EOF
             ) {
               withEnv(["HOME=/tmp"]) {
                 sh """
-                  # On est déjà dans ${env.WORKSPACE}
                   cd "${env.WORKSPACE}"
 
-                  # (Debug) Vérifions le playbook
-                  ls -l playbooks/deploy_apk.yml
+                  # Copie la clé vers un emplacement où chmod fonctionne
+                  cp /root/.ssh/id_rsa /tmp/id_rsa
+                  chmod 600 /tmp/id_rsa
 
-                  # Lancement du playbook
+                  # (Debug) Vérifiez que la clé a les bonnes permissions
+                  ls -l /tmp/id_rsa
+
+                  # Lancement du playbook en pointant sur la clé située en /tmp
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
+                    --private-key=/tmp/id_rsa \\
                     --extra-vars "apk_src=${apkPath}"
                 """
               }
