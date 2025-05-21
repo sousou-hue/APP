@@ -25,21 +25,39 @@ EOF
       }
     }
 
+    // ----------------------------
+    // Stage de debug du socket SSH
+    // ----------------------------
+    stage('Check SSH_AUTH_SOCK') {
+      steps {
+        sshagent (credentials: ['ansible-ssh-key']) {
+          sh '''
+            echo "=== DEBUG SSH_AGENT ==="
+            echo "SSH_AUTH_SOCK = $SSH_AUTH_SOCK"
+            ls -l "$SSH_AUTH_SOCK" || echo ">> Socket file not found"
+            file "$SSH_AUTH_SOCK" || echo ">> Not a socket"
+          '''
+        }
+      }
+    }
+
+    // ----------------------------
+    // Stage de déploiement avec Ansible
+    // ----------------------------
     stage('Deploy with Ansible') {
       steps {
-        // 1) Démarre l’agent SSH avec la clé **sans passphrase**
         sshagent (credentials: ['ansible-ssh-key']) {
           script {
+            // Chemin de l'APK dans le workspace
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            // 2) Monte LE FICHIER socket directement sous un nom fixe
+            // Lancement du conteneur Ansible en montant directement le socket
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +
-              "-u root " +
-              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent.sock:ro " +
-              "-e SSH_AUTH_SOCK=/ssh-agent.sock"
+              "--entrypoint '' " +                          // Désactive l’ENTRYPOINT de l’image
+              "-u root " +                                  // Exécuter en root pour accéder au socket
+              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent.sock:ro " + // Monte le fichier socket
+              "-e SSH_AUTH_SOCK=/ssh-agent.sock"              // Pointe SSH dessus
             ) {
-              // 3) Exécute Ansible
               sh """
                 cd "${env.WORKSPACE}"
                 export ANSIBLE_HOST_KEY_CHECKING=False
