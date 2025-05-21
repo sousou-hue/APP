@@ -1,54 +1,28 @@
-/* ------------------------------------------------------------------
-   Jenkinsfile
-   - Build APK (Android)
-   - Archive artefact
-   - Déployer via Ansible (clé privée UNIQUE – Secret file –, pas de ssh-agent)
-   ------------------------------------------------------------------ */
-
 pipeline {
-  /* le conteneur agent Jenkins déjà lancé (android-agent) */
   agent { label 'android-build' }
-
+  environment {
+    // Pour que Ansible ne fasse pas de vérification de hostkey
+    ANSIBLE_HOST_KEY_CHECKING = 'False'
+  }
   stages {
-
-    /* ---------- compilation Android ---------- */
     stage('Build APK') {
       steps {
         sh 'chmod +x gradlew'
         sh './gradlew assembleDebug'
       }
     }
-
-    /* ---------- archivage ---------- */
     stage('Archive APK') {
       steps {
         archiveArtifacts artifacts: '**/app-debug.apk', fingerprint: true
       }
     }
-
-    /* ---------- déploiement Ansible ---------- */
     stage('Deploy with Ansible') {
       steps {
-
-        /* 
-         * 1) Jenkins écrit la clé privée (credential ID = ansible-private-key)
-         *    dans un fichier temporaire dont le chemin est exposé
-         *    dans la variable $KEY_FILE.
-         */
-        withCredentials([file(credentialsId: 'ansible-deploy-key',
-                              variable: 'KEY_FILE')]) {
-
+        withCredentials([
+          file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')
+        ]) {
           script {
-            /* chemin APK à transmettre au playbook */
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
-
-            /* 
-             * 2) on lance le conteneur Ansible :
-             *    - workspace monté en lecture seule
-             *    - clé privée montée en /tmp/id_rsa (lecture seule)
-             *    - pas de ssh-agent, pas de socket
-             *    - l’utilisateur SSH sera lu dans l’inventory
-             */
             sh """
               docker run --rm \\
                 --network jenkins-net \\
