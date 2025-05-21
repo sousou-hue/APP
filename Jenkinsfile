@@ -32,7 +32,7 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
-            // Chemin fixe de l'APK généré
+            // Chemin fixe de l'APK
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
             docker.image('soumiael774/my-ansible-agent:latest').inside(
@@ -40,8 +40,8 @@ EOF
               "-v \$WORKSPACE:/workspace " +
               "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
             ) {
-              // Forcer HOME pour que Ansible écrive ses tmp dans /workspace
-              withEnv(["HOME=/workspace"]) {
+              // On définit HOME pour éviter les problèmes de permissions sur ~/.ansible
+              withEnv(["HOME=/tmp"]) {
                 sh """
                   cd /workspace
                   ansible-playbook \\
