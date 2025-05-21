@@ -1,6 +1,10 @@
 pipeline {
   agent { label 'android-build' }
 
+  environment {
+    APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
+  }
+
   stages {
     stage('Prepare local.properties') {
       steps {
@@ -27,7 +31,6 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
-        // On utilise le type "Secret file" dans les credentials Jenkins
         withCredentials([file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')]) {
           script {
             sh """
@@ -39,7 +42,7 @@ EOF
                   -i ${env.WORKSPACE}/inventory/k8s_hosts.ini \
                   ${env.WORKSPACE}/playbooks/deploy_apk.yml \
                   --private-key /tmp/id_rsa \
-                  --extra-vars "apk_src=${env.WORKSPACE}/${APK_PATH}"
+                  --extra-vars "apk_src=${env.WORKSPACE}/${env.APK_PATH}"
             """
           }
         }
