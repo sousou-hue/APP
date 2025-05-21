@@ -29,20 +29,22 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
-            // Remplace findFiles() par le chemin connu :
+            // Chemin fixe de l'APK généré
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
+            // Désactivation de l'ENTRYPOINT avec --entrypoint ''
             docker.image('soumiael774/my-ansible-agent:latest').inside(
+              "--entrypoint '' " +
               "-v \$WORKSPACE:/workspace " +
               "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
             ) {
-              sh """
+              sh '''
                 cd /workspace
-                ansible-playbook \\
-                  -i inventory/k8s_hosts.ini \\
-                  playbooks/deploy_apk.yml \\
+                ansible-playbook \
+                  -i inventory/k8s_hosts.ini \
+                  playbooks/deploy_apk.yml \
                   --extra-vars "apk_src=${apkPath}"
-              """
+              '''
             }
           }
         }
