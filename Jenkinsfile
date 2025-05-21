@@ -25,6 +25,29 @@ EOF
       }
     }
 
+    stage('Debug SSH in Container') {
+      steps {
+        sshagent (credentials: ['ansible-ssh-key']) {
+          script {
+            docker.image('soumiael774/my-ansible:latest').inside(
+              "--entrypoint '' " +
+              "-u root " +
+              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent.sock:ro " +
+              "-e SSH_AUTH_SOCK=/ssh-agent.sock"
+            ) {
+              sh '''
+                echo "== SSH identities =="
+                ssh-add -l || echo ">> Aucune identité SSH trouvée !"
+
+                echo "== Test connexion brute =="
+                ssh -o StrictHostKeyChecking=no -o ForwardAgent=yes kali_lunix@192.168.0.9 echo "PONG" || echo ">> Auth SSH échouée !"
+              '''
+            }
+          }
+        }
+      }
+    }
+
     stage('Deploy with Ansible') {
       steps {
         sshagent (credentials: ['ansible-ssh-key']) {
@@ -39,7 +62,6 @@ EOF
             ) {
               sh """
                 cd "${env.WORKSPACE}"
-                # Pas besoin de --ssh-extra-args, ansible.cfg le gère
                 ansible-playbook \\
                   -i inventory/k8s_hosts.ini \\
                   playbooks/deploy_apk.yml \\
