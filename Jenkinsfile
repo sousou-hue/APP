@@ -27,29 +27,30 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
-        // 1) Démarre l’agent SSH Jenkins avec la clé sans passphrase
-        sshagent (credentials: ['ansible-ssh-key']) {
+        sshagent(['ansible-ssh-key']) {
           script {
+            // 1) Chemin absolu de l'APK
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
+            // 2) Récupérer le dossier parent du socket SSH
+            def sockDir = env.SSH_AUTH_SOCK.substring(0, env.SSH_AUTH_SOCK.lastIndexOf('/'))
 
-            // 2) Lance le conteneur Ansible en montant le socket SSH
+            // 3) Lancer le conteneur Ansible en forwardant le dossier du socket et la variable
             docker.image('soumiael774/my-ansible:latest').inside(
-              // Monte le socket host dans /ssh-agent du conteneur
+              "--entrypoint '' " +
               "-u root " +
-              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent " +
-              // Indique à SSH où trouver l’agent
-              "-e SSH_AUTH_SOCK=/ssh-agent"
+              "-v ${sockDir}:${sockDir} " +
+              "-e SSH_AUTH_SOCK=${env.SSH_AUTH_SOCK}"
             ) {
-              // 3) Exécute le playbook Ansible
-              sh """
-                cd "${env.WORKSPACE}"
-                export ANSIBLE_HOST_KEY_CHECKING=False
-
-                ansible-playbook \\
-                  -i inventory/k8s_hosts.ini \\
-                  playbooks/deploy_apk.yml \\
-                  --extra-vars "apk_src=${apkPath}"
-              """
+              // 4) Forcer HOME pour les tmp d'Ansible et désactiver le host-key-checking
+              withEnv(["HOME=/tmp", "ANSIBLE_HOST_KEY_CHECKING=False"]) {
+                sh """
+                  cd "${env.WORKSPACE}"
+                  ansible-playbook \\
+                    -i inventory/k8s_hosts.ini \\
+                    playbooks/deploy_apk.yml \\
+                    --extra-vars "apk_src=${apkPath}"
+                """
+              }
             }
           }
         }
