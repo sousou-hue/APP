@@ -27,33 +27,29 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
-        sshagent(['ansible-ssh-key']) {
+        // 1) Démarre l’agent SSH Jenkins avec la clé sans passphrase
+        sshagent (credentials: ['ansible-ssh-nopass']) {
           script {
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
-            // 1) On récupère la valeur exacte de SSH_AUTH_SOCK
-            echo "SSH_AUTH_SOCK is at: ${env.SSH_AUTH_SOCK}"
 
-            // 2) On monte **le dossier contenant** le socket, 
-            //    et non juste le fichier, au même endroit.
-            def sockDir = env.SSH_AUTH_SOCK.substring(0, env.SSH_AUTH_SOCK.lastIndexOf('/'))
-
+            // 2) Lance le conteneur Ansible en montant le socket SSH
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +
+              // Monte le socket host dans /ssh-agent du conteneur
               "-u root " +
-              // Montre le répertoire entier
-              "-v ${sockDir}:${sockDir} " +
-              // On n'a pas besoin de -e, l'agent SSH injecte déjà SSH_AUTH_SOCK
-              ""
+              "-v ${env.SSH_AUTH_SOCK}:/ssh-agent " +
+              // Indique à SSH où trouver l’agent
+              "-e SSH_AUTH_SOCK=/ssh-agent"
             ) {
-              withEnv(["HOME=/tmp", "ANSIBLE_HOST_KEY_CHECKING=False"]) {
-                sh """
-                  cd "${env.WORKSPACE}"
-                  ansible-playbook \\
-                    -i inventory/k8s_hosts.ini \\
-                    playbooks/deploy_apk.yml \\
-                    --extra-vars "apk_src=${apkPath}"
-                """
-              }
+              // 3) Exécute le playbook Ansible
+              sh """
+                cd "${env.WORKSPACE}"
+                export ANSIBLE_HOST_KEY_CHECKING=False
+
+                ansible-playbook \\
+                  -i inventory/k8s_hosts.ini \\
+                  playbooks/deploy_apk.yml \\
+                  --extra-vars "apk_src=${apkPath}"
+              """
             }
           }
         }
