@@ -35,7 +35,7 @@ EOF
             // Chemin absolu vers l'APK
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            docker.image('soumiael774/my-ansible-agent:latest').inside(
+            docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +                  // désactive ENTRYPOINT
               "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"  // clé privée
             ) {
