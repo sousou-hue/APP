@@ -27,21 +27,22 @@ EOF
 
     stage('Deploy with Ansible') {
       steps {
+        // Démarrage de l’agent SSH et chargement de la clé
         sshagent(['ansible-ssh-key']) {
           script {
-            // 1) Chemin absolu de l'APK
+            // 1) Chemin complet de l'APK dans le workspace
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
-            // 2) Récupérer le dossier parent du socket SSH
+            // 2) Répertoire parent du socket SSH
             def sockDir = env.SSH_AUTH_SOCK.substring(0, env.SSH_AUTH_SOCK.lastIndexOf('/'))
 
-            // 3) Lancer le conteneur Ansible en forwardant le dossier du socket et la variable
+            // 3) Lancement du conteneur Ansible
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +
-              "-u root " +
-              "-v ${sockDir}:${sockDir} " +
+              "--entrypoint '' " +      // Ignore l’ENTRYPOINT de l’image
+              "-u root " +              // Pour que /tmp et sockDir soient accessibles
+              "-v ${sockDir}:${sockDir} " +  // Monte le dossier contenant SSH_AUTH_SOCK
               "-e SSH_AUTH_SOCK=${env.SSH_AUTH_SOCK}"
             ) {
-              // 4) Forcer HOME pour les tmp d'Ansible et désactiver le host-key-checking
+              // 4) Environnement Ansible
               withEnv(["HOME=/tmp", "ANSIBLE_HOST_KEY_CHECKING=False"]) {
                 sh """
                   cd "${env.WORKSPACE}"
