@@ -32,25 +32,25 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
+            // chemin absolu de l'APK
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +
-              "-u root " +
-              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa"
+              "--entrypoint '' " +          // ignore l’ENTRYPOINT de l’image
+              "-u root " +                  // exécute en root pour accéder à /tmp
+              "-v ${ANSIBLE_KEY}:/tmp/id_rsa" // monte la clé dans /tmp/id_rsa
             ) {
               withEnv(["HOME=/tmp"]) {
                 sh """
                   cd "${env.WORKSPACE}"
 
-                  # Copie la clé vers un emplacement où chmod fonctionne
-                  cp /root/.ssh/id_rsa /tmp/id_rsa
+                  # sécurise la clé pour SSH
                   chmod 600 /tmp/id_rsa
 
-                  # (Debug) Vérifiez que la clé a les bonnes permissions
+                  # debug : vérifie la présence et les droits
                   ls -l /tmp/id_rsa
 
-                  # Lancement du playbook en pointant sur la clé située en /tmp
+                  # lance le playbook en utilisant la clé et la variable apk_src
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
