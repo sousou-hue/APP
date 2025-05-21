@@ -32,23 +32,26 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
-            // Le chemin absolu vers l'APK dans le workspace
+            // Chemin absolu vers l'APK
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
             docker.image('soumiael774/my-ansible-agent:latest').inside(
-              "--entrypoint '' " +                 // désactive l’ENTRYPOINT de l’image
-              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"  // monte la clé privée
+              "--entrypoint '' " +                  // désactive ENTRYPOINT
+              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"  // clé privée
             ) {
-              // Forcer home pour éviter les problèmes de permission sur ~/.ansible
               withEnv(["HOME=/tmp"]) {
-                // On est déjà dans le workspace monté (même chemin que Jenkins)
                 sh """
-                  # (Optionnel) Vérifions que nos fichiers sont bien là
-                  pwd
-                  ls -R .
+                  # On se place dans le workspace, tel qu’il est monté par Jenkins
+                  cd "${env.WORKSPACE}"
 
-                  # On lance le playbook
-                  ansible-playbook -i inventory/k8s_hosts.ini playbooks/deploy_apk.yml \\
+                  # (Debug) Vérifions que le playbook existe et n’est pas vide
+                  ls -l playbooks/deploy_apk.yml
+                  head -n 20 playbooks/deploy_apk.yml
+
+                  # Lancement du playbook
+                  ansible-playbook \\
+                    -i inventory/k8s_hosts.ini \\
+                    playbooks/deploy_apk.yml \\
                     --extra-vars "apk_src=${apkPath}"
                 """
               }
