@@ -32,24 +32,28 @@ EOF
           keyFileVariable: 'ANSIBLE_KEY'
         )]) {
           script {
-            // Chemin fixe de l'APK généré
+            // Chemin de l’APK
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            // Lancement du conteneur Ansible
             docker.image('soumiael774/my-ansible-agent:latest').inside(
-              "--entrypoint '' " +                  // Désactive l'ENTRYPOINT de l'image
-              "-v \$WORKSPACE:/workspace " +        // Monte le workspace
-              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro " +  // Monte la clé privée
-              "-w /workspace"                       // Définit le répertoire de travail
+              "--entrypoint '' " +             // Désactive ENTRYPOINT
+              "-v \$WORKSPACE:/workspace " +   // Monte le workspace sous /workspace
+              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
             ) {
-              // On force HOME pour que les tmp d'Ansible se créent dans /tmp
               withEnv(["HOME=/tmp"]) {
-                sh """
-                  ansible-playbook \\
-                    -i inventory/k8s_hosts.ini \\
-                    playbooks/deploy_apk.yml \\
-                    --extra-vars "apk_src=${apkPath}"
-                """
+                sh '''
+                  # On se place dans /workspace où votre code et vos playbooks résident
+                  cd /workspace
+
+                  # (Optionnel) debug : lister pour vérifier
+                  ls -R .
+
+                  # Enfin, exécuter le playbook
+                  ansible-playbook \
+                    -i inventory/k8s_hosts.ini \
+                    playbooks/deploy_apk.yml \
+                    --extra-vars "apk_src='${apkPath}'"
+                '''
               }
             }
           }
