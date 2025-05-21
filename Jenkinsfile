@@ -1,6 +1,11 @@
 pipeline {
   agent { label 'android-build' }
 
+  environment {
+    // Pour debug, on affiche toutes les variables
+    DEBUG=true
+  }
+
   stages {
     stage('Prepare local.properties') {
       steps {
@@ -25,27 +30,69 @@ EOF
       }
     }
 
+    stage('Check SSH_AUTH_SOCK on Agent') {
+      steps {
+        sshagent (credentials: ['ansible-ssh-nopass']) {
+          sh '''
+            echo "=== HOST DEBUG ==="
+            echo "User: $(whoami)"
+            echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
+            ls -ld "$(dirname $SSH_AUTH_SOCK)" || echo ">> parent dir missing"
+            ls -l "$SSH_AUTH_SOCK" || echo ">> socket missing"
+            file "$SSH_AUTH_SOCK" || echo ">> not a socket"
+          '''
+        }
+      }
+    }
+
     stage('Debug SSH in Container') {
       steps {
         sshagent (credentials: ['ansible-ssh-key']) {
           script {
-            // 1) calcule le dossier parent du socket
+            // calcul du répertoire parent du socket
             def sockDir = env.SSH_AUTH_SOCK.substring(0, env.SSH_AUTH_SOCK.lastIndexOf('/'))
-
             docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +
               "-u root " +
-              // 2) monte le dossier parent exactement au même endroit
               "-v ${sockDir}:${sockDir}:ro " +
-              // 3) on n’a pas besoin de changer SSH_AUTH_SOCK
               "-e SSH_AUTH_SOCK=${env.SSH_AUTH_SOCK}"
             ) {
               sh '''
-                echo "== SSH identities =="
-                ssh-add -l || echo ">> Aucune identité SSH trouvée !"
+                echo "=== CONTAINER DEBUG ==="
+                echo "User in container: $(whoami)"
+                echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK"
+                ls -ld "$(dirname $SSH_AUTH_SOCK)" || echo ">> parent dir missing"
+                ls -l "$SSH_AUTH_SOCK" || echo ">> socket missing"
+                # test file command
+                if command -v file &>/dev/null; then
+                  file "$SSH_AUTH_SOCK"
+                else
+                  echo ">> file not installed"
+                fi
 
-                echo "== Test connexion brute =="
-                ssh -o StrictHostKeyChecking=no -o ForwardAgent=yes kali_lunix@192.168.0.9 echo PONG || echo ">> Auth SSH échouée !"
+                # test ssh-add
+                echo "-- identities via ssh-add:"
+                if command -v ssh-add &>/dev/null; then
+                  ssh-add -l || echo ">> no identities!"
+                else
+                  echo ">> ssh-add not found"
+                fi
+
+                # test raw ssh connectivity
+                echo "-- raw SSH test (should print PONG):"
+                if command -v ssh &>/dev/null; then
+                  ssh -o StrictHostKeyChecking=no -o ForwardAgent=yes kali_lunix@192.168.0.9 echo PONG || echo ">> SSH auth failed"
+                else
+                  echo ">> ssh client missing"
+                fi
+
+                # test ansible piped dry-run
+                echo "-- ansible ping test:"
+                if command -v ansible &>/dev/null; then
+                  ansible master -m ping -i inventory/k8s_hosts.ini --ssh-extra-args='-o ForwardAgent=yes' || echo ">> ansible ping failed"
+                else
+                  echo ">> ansible CLI missing"
+                fi
               '''
             }
           }
@@ -53,17 +100,15 @@ EOF
       }
     }
 
-    stage('Deploy with Ansible') {
+    stage('Deploy with Ansible (final)') {
       steps {
         sshagent (credentials: ['ansible-ssh-key']) {
           script {
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
             def sockDir = env.SSH_AUTH_SOCK.substring(0, env.SSH_AUTH_SOCK.lastIndexOf('/'))
-
             docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +
               "-u root " +
-              // monte le répertoire parent du socket
               "-v ${sockDir}:${sockDir}:ro " +
               "-e SSH_AUTH_SOCK=${env.SSH_AUTH_SOCK}"
             ) {
@@ -72,7 +117,8 @@ EOF
                 ansible-playbook \\
                   -i inventory/k8s_hosts.ini \\
                   playbooks/deploy_apk.yml \\
-                  --extra-vars "apk_src=${apkPath}"
+                  --extra-vars "apk_src=${apkPath}" \\
+                  --ssh-extra-args='-o ForwardAgent=yes'
               """
             }
           }
