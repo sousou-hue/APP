@@ -32,7 +32,7 @@ EOF
 
     stage('Check SSH_AUTH_SOCK on Agent') {
       steps {
-        sshagent (credentials: ['ansible-ssh-nopass']) {
+        sshagent (credentials: ['ansible-ssh-key']) {
           sh '''
             echo "=== HOST DEBUG ==="
             echo "User: $(whoami)"
