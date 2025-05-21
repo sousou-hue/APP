@@ -37,20 +37,17 @@ EOF
             docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +
               "-u root " +
-              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
+              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa"
             ) {
               withEnv(["HOME=/tmp"]) {
                 sh """
-                  # Sécurise la clé SSH pour SSH
-                  chmod 600 /root/.ssh/id_rsa
-
-                  # Positionnement dans le workspace Jenkins
+                  # On est déjà dans ${env.WORKSPACE}
                   cd "${env.WORKSPACE}"
 
-                  # (Debug facultatif) lister fichiers
+                  # (Debug) Vérifions le playbook
                   ls -l playbooks/deploy_apk.yml
 
-                  # Lancement du playbook avec la variable apk_src
+                  # Lancement du playbook
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
