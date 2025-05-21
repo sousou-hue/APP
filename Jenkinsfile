@@ -2,16 +2,6 @@ pipeline {
   agent { label 'android-build' }
 
   stages {
-    stage('Prepare local.properties') {
-      steps {
-        sh '''
-          cat > local.properties <<EOF
-sdk.dir=/opt/android-sdk
-EOF
-        '''
-      }
-    }
-
     stage('Build APK') {
       steps {
         sh 'chmod +x gradlew'
@@ -25,56 +15,30 @@ EOF
       }
     }
 
-    stage('Debug SSH in Container') {
+    stage('Deploy with Ansible (clé partagée)') {
       steps {
-        sshagent (credentials: ['ansible-ssh-key']) {
-          script {
-            def sockFile = env.SSH_AUTH_SOCK
-            def sockDir = sockFile.substring(0, sockFile.lastIndexOf('/'))
-            docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +
-              "-u root " +
-              "-v ${sockDir}:${sockDir} " +
-              "-e SSH_AUTH_SOCK=${sockFile} "
-            ) {
-              sh '''
-                echo "==== DEBUG SSH SOCKET ===="
-                echo SSH_AUTH_SOCK  : $SSH_AUTH_SOCK
-                echo -n "SSH_AUTH_SOCK (exists?): "
-                [ -S "$SSH_AUTH_SOCK" ] && echo OK || echo NOK
-                echo "ls -l du dossier socket :"
-                ls -l $(dirname $SSH_AUTH_SOCK) || echo "ls failed"
-                echo "ssh-add -l (identité présente ?):"
-                ssh-add -l || echo ">> Aucune identité SSH trouvée !"
-              '''
-            }
-          }
-        }
-      }
-    }
 
-    stage('Deploy with Ansible') {
-      steps {
-        sshagent (credentials: ['ansible-ssh-key']) {
+        /* ❶ Jenkins écrit la clé dans $KEY_FILE */
+        withCredentials([file(credentialsId: 'ansible-deploy-key',
+                              variable: 'KEY_FILE')]) {
+
           script {
-            def sockFile = env.SSH_AUTH_SOCK
-            def sockDir = sockFile.substring(0, sockFile.lastIndexOf('/'))
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +
-              "-u root " +
-              "-v ${sockDir}:${sockDir} " +
-              "-e SSH_AUTH_SOCK=${sockFile} "
-            ) {
-              sh """
-                cd "${env.WORKSPACE}"
-                ansible-playbook \\
-                  -i inventory/k8s_hosts.ini \\
-                  playbooks/deploy_apk.yml \\
+            /* ❷ Conteneur Ansible : on monte la clé en lecture seule */
+            sh """
+              docker run --rm \
+                --network jenkins-net \
+                -v ${env.WORKSPACE}:${env.WORKSPACE}:ro \
+                -v \$KEY_FILE:/tmp/id_rsa:ro \
+                -e ANSIBLE_HOST_KEY_CHECKING=False \
+                soumiael774/my-ansible:latest \
+                ansible-playbook \
+                  -i ${env.WORKSPACE}/inventory/k8s_hosts.ini \
+                  ${env.WORKSPACE}/playbooks/deploy_apk.yml \
+                  --private-key /tmp/id_rsa \
                   --extra-vars "apk_src=${apkPath}"
-              """
-            }
+            """
           }
         }
       }
