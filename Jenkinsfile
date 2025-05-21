@@ -25,32 +25,28 @@ EOF
       }
     }
 
-    stage('Deploy with Ansible') {
-      steps {
-        withCredentials([sshUserPrivateKey(
-          credentialsId: 'ansible-ssh-key',
-          keyFileVariable: 'ANSIBLE_KEY'
-        )]) {
-          script {
-            // Chemin fixe de l'APK
-            def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
+  stage('Deploy with Ansible') {
+   steps {
+    withCredentials([sshUserPrivateKey(
+      credentialsId: 'ansible-ssh-key',
+      keyFileVariable: 'ANSIBLE_KEY'
+    )]) {
+      script {
+        def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
-            docker.image('soumiael774/my-ansible-agent:latest').inside(
-              "--entrypoint '' " +
-              "-v \$WORKSPACE:/workspace " +
-              "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
-            ) {
-              // On définit HOME pour éviter les problèmes de permissions sur ~/.ansible
-              withEnv(["HOME=/tmp"]) {
-                sh """
-                  cd /workspace
-                  ansible-playbook \\
-                    -i inventory/k8s_hosts.ini \\
-                    playbooks/deploy_apk.yml \\
-                    --extra-vars "apk_src=${apkPath}"
-                """
-              }
-            }
+        docker.image('soumiael774/my-ansible-agent:latest').inside(
+          "--entrypoint '' " +
+          "-v \$WORKSPACE:/workspace " +
+          "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro " +
+          "-w /workspace"
+        ) {
+          withEnv(["HOME=/tmp"]) {
+            sh """
+              ansible-playbook \\
+                -i inventory/k8s_hosts.ini \\
+                playbooks/deploy_apk.yml \\
+                --extra-vars "apk_src=${apkPath}"
+            """
           }
         }
       }
