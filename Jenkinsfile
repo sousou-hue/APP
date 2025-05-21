@@ -29,21 +29,22 @@ EOF
       steps {
         sshagent (credentials: ['ansible-ssh-key']) {
           script {
-            // Récupérer le chemin du socket et du dossier parent
             def sockFile = env.SSH_AUTH_SOCK
             def sockDir = sockFile.substring(0, sockFile.lastIndexOf('/'))
-
             docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +
               "-u root " +
-              "-v ${sockDir}:${sockDir} " +   // <---- C’est ça la correction magique !
-              "-e SSH_AUTH_SOCK=${sockFile}"
+              "-v ${sockDir}:${sockDir} " +
+              "-e SSH_AUTH_SOCK=${sockFile} "
             ) {
               sh '''
                 echo "==== DEBUG SSH SOCKET ===="
-                echo "SSH_AUTH_SOCK  : $SSH_AUTH_SOCK"
-                echo "SSH_AUTH_SOCK (exists?):"; [ -S "$SSH_AUTH_SOCK" ] && echo OK || echo NOK
+                echo SSH_AUTH_SOCK  : $SSH_AUTH_SOCK
+                echo -n "SSH_AUTH_SOCK (exists?): "
+                [ -S "$SSH_AUTH_SOCK" ] && echo OK || echo NOK
+                echo "ls -l du dossier socket :"
                 ls -l $(dirname $SSH_AUTH_SOCK) || echo "ls failed"
+                echo "ssh-add -l (identité présente ?):"
                 ssh-add -l || echo ">> Aucune identité SSH trouvée !"
               '''
             }
@@ -52,20 +53,19 @@ EOF
       }
     }
 
-    // Tu peux faire pareil pour ta phase Deploy avec Ansible
     stage('Deploy with Ansible') {
       steps {
         sshagent (credentials: ['ansible-ssh-key']) {
           script {
-            def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
             def sockFile = env.SSH_AUTH_SOCK
             def sockDir = sockFile.substring(0, sockFile.lastIndexOf('/'))
+            def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
             docker.image('soumiael774/my-ansible:latest').inside(
               "--entrypoint '' " +
               "-u root " +
               "-v ${sockDir}:${sockDir} " +
-              "-e SSH_AUTH_SOCK=${sockFile}"
+              "-e SSH_AUTH_SOCK=${sockFile} "
             ) {
               sh """
                 cd "${env.WORKSPACE}"
