@@ -1,15 +1,14 @@
 pipeline {
   agent { label 'android-build' }
 
-  environment {
-    APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
-    WORKDIR = "${env.WORKSPACE}"
-  }
-
   stages {
-    stage('Checkout') {
+    stage('Prepare local.properties') {
       steps {
-        checkout scm
+        sh '''
+          cat > local.properties <<EOF
+sdk.dir=/opt/android-sdk
+EOF
+        '''
       }
     }
 
