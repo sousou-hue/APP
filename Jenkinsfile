@@ -35,13 +35,22 @@ EOF
             def apkPath = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
 
             docker.image('soumiael774/my-ansible:latest').inside(
-              "--entrypoint '' " +   // ignore ENTRYPOINT de l'image
-              "-u root " +           // lance le conteneur en tant que root
+              "--entrypoint '' " +
+              "-u root " +
               "-v ${ANSIBLE_KEY}:/root/.ssh/id_rsa:ro"
             ) {
               withEnv(["HOME=/tmp"]) {
                 sh """
+                  # Sécurise la clé SSH pour SSH
+                  chmod 600 /root/.ssh/id_rsa
+
+                  # Positionnement dans le workspace Jenkins
                   cd "${env.WORKSPACE}"
+
+                  # (Debug facultatif) lister fichiers
+                  ls -l playbooks/deploy_apk.yml
+
+                  # Lancement du playbook avec la variable apk_src
                   ansible-playbook \\
                     -i inventory/k8s_hosts.ini \\
                     playbooks/deploy_apk.yml \\
