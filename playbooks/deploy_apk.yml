@@ -3,7 +3,7 @@
   hosts: k8s-master
   become: true
   vars:
-    apk_src: ""   # sera passé depuis Jenkins via --extra-vars
+    apk_src: ""  # transmis depuis Jenkins
   tasks:
     - name: Créer /opt/apks sur le master
       file:
@@ -20,9 +20,9 @@
     - name: Appliquer le Deployment NGINX-APK
       k8s:
         state: present
-        definition: "{{ lookup('file', 'k8s-manifests/nginx-apk-deployment.yaml') }}"
+        definition: "{{ lookup('file', playbook_dir + '/k8s-manifests/nginx-apk-deployment.yaml') }}"
 
     - name: Appliquer le Service NGINX-APK
       k8s:
         state: present
-        definition: "{{ lookup('file', 'k8s-manifests/nginx-apk-service.yaml') }}"
+        definition: "{{ lookup('file', playbook_dir + '/k8s-manifests/nginx-apk-service.yaml') }}"
