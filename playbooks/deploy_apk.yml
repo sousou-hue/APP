@@ -1,28 +1,30 @@
 ---
-- name: Copier l’APK et déployer NGINX-APK dans Kubernetes
+- name: Déployer l’APK avec NGINX (sans Kubernetes)
   hosts: k8s-master
   become: true
   vars:
-    apk_src: ""  # transmis depuis Jenkins via --extra-vars
+    apk_src: ""  # transmis depuis Jenkins
+
   tasks:
-    - name: Créer /opt/apks sur le master
+    - name: Installer NGINX s'il n'est pas présent
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Créer le dossier de publication si absent
       file:
-        path: /opt/apks
+        path: /var/www/html
         state: directory
         mode: '0755'
 
-    - name: Copier l’APK depuis Jenkins dans /opt/apks
+    - name: Copier l’APK dans le dossier NGINX
       copy:
         src: "{{ apk_src }}"
-        dest: /opt/apks/app-debug.apk
+        dest: /var/www/html/app-debug.apk
         mode: '0644'
 
-    - name: Appliquer le Deployment NGINX-APK
-      k8s:
-        state: present
-        definition: "{{ lookup('file', playbook_dir + '/../k8s-manifests/nginx-apk-deployment.yaml') }}"
-
-    - name: Appliquer le Service NGINX-APK
-      k8s:
-        state: present
-        definition: "{{ lookup('file', playbook_dir + '/../k8s-manifests/nginx-apk-service.yaml') }}"
+    - name: Redémarrer NGINX
+      service:
+        name: nginx
+        state: restarted

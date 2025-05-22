@@ -2,8 +2,7 @@ pipeline {
   agent { label 'android-build' }
 
   environment {
-    // Chemin absolu généré dynamiquement depuis Jenkins WORKSPACE
-    APK_PATH = "${WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
+    APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
   }
 
   stages {
@@ -35,8 +34,8 @@ EOF
         withCredentials([file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')]) {
           sh """
             ansible-playbook -i inventory/k8s_hosts.ini playbooks/deploy_apk.yml \
-              --private-key $KEY_FILE \
-              --extra-vars "apk_src=${APK_PATH}"
+              --private-key \$KEY_FILE \
+              --extra-vars apk_src=${APK_PATH}
           """
         }
       }
