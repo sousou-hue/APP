@@ -3,7 +3,7 @@
   hosts: k8s-master
   become: true
   vars:
-    apk_src: ""  # transmis depuis Jenkins
+    apk_src: ""  # Chemin absolu transmis par Jenkins
 
   tasks:
     - name: Installer NGINX s'il n'est pas présent
@@ -23,6 +23,7 @@
         src: "{{ apk_src }}"
         dest: /var/www/html/app-debug.apk
         mode: '0644'
+        remote_src: no
 
     - name: Redémarrer NGINX
       service:

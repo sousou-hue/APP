@@ -35,7 +35,7 @@ EOF
           sh """
             ansible-playbook -i inventory/k8s_hosts.ini playbooks/deploy_apk.yml \
               --private-key \$KEY_FILE \
-              --extra-vars apk_src=${APK_PATH}
+              --extra-vars "apk_src=${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
           """
         }
       }
