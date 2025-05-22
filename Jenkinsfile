@@ -2,7 +2,8 @@ pipeline {
   agent { label 'android-build' }
 
   environment {
-    APK_PATH = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
+    // Chemin absolu généré dynamiquement depuis Jenkins WORKSPACE
+    APK_PATH = "${WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
   }
 
   stages {
@@ -25,15 +26,13 @@ EOF
 
     stage('Archive APK') {
       steps {
-        archiveArtifacts artifacts: '**/*.apk', fingerprint: true
+        archiveArtifacts artifacts: '**/app-debug.apk', fingerprint: true
       }
     }
 
     stage('Deploy with Ansible') {
       steps {
-        withCredentials([
-          sshUserPrivateKey(credentialsId: 'ansible-deploy-key', keyFileVariable: 'KEY_FILE')
-        ]) {
+        withCredentials([file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')]) {
           sh """
             ansible-playbook -i inventory/k8s_hosts.ini playbooks/deploy_apk.yml \
               --private-key $KEY_FILE \
