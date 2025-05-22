@@ -2,7 +2,7 @@ pipeline {
   agent { label 'android-build' }
 
   environment {
-    APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
+    APK_PATH = "${env.WORKSPACE}/app/build/outputs/apk/debug/app-debug.apk"
   }
 
   stages {
@@ -25,18 +25,20 @@ EOF
 
     stage('Archive APK') {
       steps {
-        archiveArtifacts artifacts: '**/app-debug.apk', fingerprint: true
+        archiveArtifacts artifacts: '**/*.apk', fingerprint: true
       }
     }
 
     stage('Deploy with Ansible') {
       steps {
-        withCredentials([file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')]) {
-          sh '''
+        withCredentials([
+          sshUserPrivateKey(credentialsId: 'ansible-deploy-key', keyFileVariable: 'KEY_FILE')
+        ]) {
+          sh """
             ansible-playbook -i inventory/k8s_hosts.ini playbooks/deploy_apk.yml \
               --private-key $KEY_FILE \
               --extra-vars "apk_src=${APK_PATH}"
-          '''
+          """
         }
       }
     }
