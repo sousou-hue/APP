@@ -1,29 +1,34 @@
 pipeline {
   agent { label 'android-build' }
+
   environment {
     APK_PATH = "app/build/outputs/apk/debug/app-debug.apk"
   }
+
   stages {
+    stage('Prepare local.properties') {
+      steps {
+        sh '''
+          cat > local.properties <<EOF
+sdk.dir=/opt/android-sdk
+EOF
+        '''
+      }
+    }
+
     stage('Build APK') {
       steps {
         sh 'chmod +x gradlew'
         sh './gradlew assembleDebug'
       }
     }
+
     stage('Archive APK') {
       steps {
         archiveArtifacts artifacts: '**/app-debug.apk', fingerprint: true
       }
     }
-    stage('Install Ansible') {
-      steps {
-        sh '''
-          apt-get update
-          apt-get install -y python3-pip sshpass
-          pip3 install ansible
-        '''
-      }
-    }
+
     stage('Deploy with Ansible') {
       steps {
         withCredentials([file(credentialsId: 'ansible-deploy-key', variable: 'KEY_FILE')]) {
